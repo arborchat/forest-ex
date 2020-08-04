@@ -2,13 +2,14 @@ package activeStatus
 
 import (
 	"fmt"
+	"log"
+	"time"
+
 	expiration "git.sr.ht/~athorp96/forest-ex/expiration"
 	forest "git.sr.ht/~whereswaldon/forest-go"
 	fields "git.sr.ht/~whereswaldon/forest-go/fields"
 	"git.sr.ht/~whereswaldon/forest-go/store"
 	"git.sr.ht/~whereswaldon/forest-go/twig"
-	"log"
-	"time"
 )
 
 type ActiveStatus int
@@ -75,14 +76,18 @@ func NewActivityMetadata(status ActiveStatus, ttl time.Duration) (*twig.Data, er
 		return nil, fmt.Errorf("Error creating TTL twig data: %v", err)
 	}
 
-	data.Set("invisible", 1, []byte{})
+	_, err = data.Set("invisible", 1, []byte{})
+	if err != nil {
+		return nil, fmt.Errorf("Error setting invisible metadata: %v", err)
+	}
+
 	data.Values[statusKey] = statusData
 	data.Values[ttlKey] = ttlData
 
 	return data, nil
 }
 
-func NewActivityNode(statusConversation *forest.CommonNode, builder *forest.Builder, status ActiveStatus, ttl time.Duration) (forest.Node, error) {
+func NewActivityNode(statusConversation *forest.Community, builder *forest.Builder, status ActiveStatus, ttl time.Duration) (forest.Node, error) {
 	md, err := NewActivityMetadata(status, ttl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create activity metadata: %v", err)
@@ -105,10 +110,10 @@ func NewActivityNode(statusConversation *forest.CommonNode, builder *forest.Buil
 // every time a given duration passes. It acts as a heartbeat, letting the
 // communities know a user is currently connected.
 func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.Community, builder *forest.Builder, interval time.Duration) {
-	select {
-	case <-time.Ticker(interval):
+	ticker := time.NewTicker(interval)
+	emitHeartBeat := func() {
 		for _, c := range communities {
-			statusNode, err := NewActivityNode(*c, identitytime.Hour, Active, interval)
+			statusNode, err := NewActivityNode(c, builder, Active, interval)
 			if err != nil {
 				log.Printf("Error creating active-status node: %v", err)
 			}
@@ -118,5 +123,11 @@ func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.
 			}
 			log.Printf("Emitted status node with TTL %s", interval)
 		}
+	}
+
+	// Emit an initial heartbeat
+	emitHeartBeat()
+	for range ticker.C {
+		emitHeartBeat()
 	}
 }
