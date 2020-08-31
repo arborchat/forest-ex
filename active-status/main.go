@@ -3,6 +3,7 @@ package activeStatus
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	expiration "git.sr.ht/~athorp96/forest-ex/expiration"
@@ -19,11 +20,54 @@ const (
 	Inactive
 )
 
+func (s *ActiveStatus) marshalStatus() []byte {
+	return []byte(strconv.Itoa(int(*s)))
+}
+
+func unmarshalStatus(b []byte) (ActiveStatus, error) {
+	i, e := strconv.Atoi(string(b))
+	return ActiveStatus(i), e
+}
+
 // StatusManager maps users to their current status. We may eventually
 // want to store more metadata such as `last active`, but for now
 // just knowing is a given user is active is enough
 type StatusManager struct {
 	activeUsers map[string]ActiveStatus
+}
+
+// NewStatusManager instantiates an empty StatusManager struct and returns
+// a pointer to the new object.
+func NewStatusManager() *StatusManager {
+	return &StatusManager{
+		activeUsers: make(map[string]ActiveStatus),
+	}
+}
+
+// HandleNode takes as an argument a reply node. If it is an active status message,
+// it updates the StatusManager accordingly.
+func (self *StatusManager) HandleNode(node forest.Node) {
+
+	md, err := node.TwigMetadata()
+	if err != nil {
+		log.Printf("Error unmarshalling twig metadata: %v", err)
+		return
+	}
+
+	twigKey := ActiveStatusKey()
+	data, isActivityNode := md.Values[twigKey]
+	if !isActivityNode {
+		// Not activityNode
+		return
+	}
+
+	status, err := unmarshalStatus(data)
+	if err != nil {
+		log.Print("Malformed status request. Twig data: %v. Error: %v", data, err)
+	}
+
+	log.Printf("User %v updated status to %v", node.Author, status)
+	self.setStatus(node.Author, status)
 }
 
 func (self *StatusManager) setStatus(user fields.QualifiedHash, status ActiveStatus) {
@@ -50,10 +94,16 @@ func (self *StatusManager) IsActive(user fields.QualifiedHash) bool {
 	return self.Status(user) == Active
 }
 
+// ActiveStatusKey defines the key used in the activeStatus metadata.
+// Anywhere that references an activeStatus key must call this function
+func ActiveStatusKey() twig.Key {
+	return twig.Key{Name: "activity", Version: 1}
+}
+
 // activityMetadata determines the format of the twig metadata used to
 // establish a node as an activity node
 func activeStatusMetadata(status ActiveStatus) (twig.Key, []byte) {
-	return twig.Key{Name: "activity", Version: 1}, []byte{byte(status)}
+	return ActiveStatusKey(), status.marshalStatus()
 }
 
 // ActivityMetadata creates an acitivity status twig data object for
@@ -76,10 +126,7 @@ func NewActivityMetadata(status ActiveStatus, ttl time.Duration) (*twig.Data, er
 		return nil, fmt.Errorf("Error creating TTL twig data: %v", err)
 	}
 
-	_, err = data.Set("invisible", 1, []byte{})
-	if err != nil {
-		return nil, fmt.Errorf("Error setting invisible metadata: %v", err)
-	}
+	data.Set("invisible", 1, []byte{})
 
 	data.Values[statusKey] = statusData
 	data.Values[ttlKey] = ttlData
