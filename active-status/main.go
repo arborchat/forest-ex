@@ -20,11 +20,13 @@ const (
 	Inactive
 )
 
-func (s *ActiveStatus) marshalStatus() []byte {
+// MarshalBinary translates an ActiveStatus into a byte slice
+func (s *ActiveStatus) MarshalBinary() []byte {
 	return []byte(strconv.Itoa(int(*s)))
 }
 
-func unmarshalStatus(b []byte) (ActiveStatus, error) {
+// UnmarshalBinary creates an ActiveStatus from a byte slice
+func UnmarshalBinary(b []byte) (ActiveStatus, error) {
 	i, e := strconv.Atoi(string(b))
 	return ActiveStatus(i), e
 }
@@ -61,15 +63,17 @@ func (self *StatusManager) HandleNode(node forest.Node) {
 		return
 	}
 
-	status, err := unmarshalStatus(data)
+	status, err := UnmarshalBinary(data)
 	if err != nil {
-		log.Print("Malformed status request. Twig data: %v. Error: %v", data, err)
+		log.Print("Malformed status request. Twig data: %b. Error: %v", data, err)
 	}
 
-	log.Printf("User %v updated status to %v", node.Author, status)
-	self.setStatus(node.Author, status)
+	log.Printf("User %v updated status to %v", node.AuthorID(), status)
+	self.setStatus(*node.AuthorID(), status)
 }
 
+// setStatus is intentionally left private so the status will always be set according to
+// the logic in HandleNode
 func (self *StatusManager) setStatus(user fields.QualifiedHash, status ActiveStatus) {
 	self.activeUsers[string(user.Blob)] = status
 }
@@ -103,7 +107,7 @@ func ActiveStatusKey() twig.Key {
 // activityMetadata determines the format of the twig metadata used to
 // establish a node as an activity node
 func activeStatusMetadata(status ActiveStatus) (twig.Key, []byte) {
-	return ActiveStatusKey(), status.marshalStatus()
+	return ActiveStatusKey(), status.MarshalBinary()
 }
 
 // ActivityMetadata creates an acitivity status twig data object for
