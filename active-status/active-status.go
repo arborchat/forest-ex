@@ -52,7 +52,7 @@ func (self *StatusManager) HandleNode(node forest.Node) {
 
 	md, err := node.TwigMetadata()
 	if err != nil {
-		log.Printf("Error unmarshalling twig metadata: %v", err)
+		log.Printf("Error unmarshalling twig metadata to handle node: %v", err)
 		return
 	}
 
@@ -130,7 +130,7 @@ func NewActivityMetadata(status ActiveStatus, ttl time.Duration) (*twig.Data, er
 		return nil, fmt.Errorf("Error creating TTL twig data: %v", err)
 	}
 
-	data.Set("invisible", 1, []byte{})
+	data.Set("invisible", 1, []byte("true"))
 
 	data.Values[statusKey] = statusData
 	data.Values[ttlKey] = ttlData
@@ -161,6 +161,7 @@ func NewActivityNode(statusConversation *forest.Community, builder *forest.Build
 // every time a given duration passes. It acts as a heartbeat, letting the
 // communities know a user is currently connected.
 func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.Community, builder *forest.Builder, interval time.Duration) {
+	log.Printf("Starting activity heartbeat")
 	ticker := time.NewTicker(interval)
 	emitHeartBeat := func() {
 		for _, c := range communities {
@@ -172,7 +173,7 @@ func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.
 			if err != nil {
 				log.Printf("Error adding active status node to store: %v", err)
 			}
-			log.Printf("Emitted status node with TTL %s", interval)
+			log.Printf("Emitted status node with TTL %s: %v", interval, statusNode.ID())
 		}
 	}
 
