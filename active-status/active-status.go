@@ -52,7 +52,7 @@ func (self *StatusManager) HandleNode(node forest.Node) {
 
 	md, err := node.TwigMetadata()
 	if err != nil {
-		log.Printf("Error unmarshalling twig metadata to handle node: %v", err)
+		log.Printf("Error unmarshalling node %s's twig metadata: %v", node.ID(), err)
 		return
 	}
 
@@ -173,7 +173,7 @@ func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.
 			if err != nil {
 				log.Printf("Error adding active status node to store: %v", err)
 			}
-			log.Printf("Emitted status node with TTL %s: %v", interval, statusNode.ID())
+			log.Printf("Emitted status node %s with TTL %s", statusNode.ID(), interval)
 		}
 	}
 
