@@ -3,7 +3,7 @@ module git.sr.ht/~athorp96/forest-ex/active-status
 go 1.14
 
 require (
-	git.sr.ht/~athorp96/forest-ex/expiration v0.0.0-20200915000224-51e6fdc2094f
+	git.sr.ht/~athorp96/forest-ex/expiration v0.0.0-20200916232020-c1b7bd288b3b
 	git.sr.ht/~whereswaldon/forest-go v0.0.0-20200914210944-b9e48a8b078d
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a // indirect
 )
