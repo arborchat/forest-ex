@@ -62,14 +62,28 @@ func (self *StatusManager) HandleNode(node forest.Node) {
 		// Not activityNode
 		return
 	}
-
 	status, err := UnmarshalBinary(data)
 	if err != nil {
 		log.Print("Malformed status request. Twig data: %b. Error: %v", data, err)
 	}
-
 	log.Printf("User %v updated status to %v", node.AuthorID(), status)
 	self.setStatus(*node.AuthorID(), status)
+
+	ttl, ttlExists := md.Values[expiration.TTLKey()]
+	if !ttlExists {
+		log.Printf("Malformed status request. Node %s has no TTL", node.ID())
+		return
+	}
+
+	expireTime, err := expiration.UnmarshalTTL(ttl)
+	if err != nil {
+		log.Print("Malformed status request. Twig data: %b. Error: %v", data, err)
+	}
+
+	go func() {
+		time.Sleep(time.Until(expireTime))
+		delete(self.activeUsers, string(node.AuthorID().Blob))
+	}()
 }
 
 // setStatus is intentionally left private so the status will always be set according to
@@ -181,5 +195,20 @@ func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.
 	emitHeartBeat()
 	for range ticker.C {
 		emitHeartBeat()
+	}
+}
+
+func KillActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.Community, builder *forest.Builder) {
+	ttl, _ := time.ParseDuration("1 hour")
+	for _, c := range communities {
+		statusNode, err := NewActivityNode(c, builder, Inactive, ttl)
+		if err != nil {
+			log.Printf("Error creating inactive-status node: %v", err)
+		}
+		err = msgStore.Add(statusNode)
+		if err != nil {
+			log.Printf("Error adding inactive status node %s to store: %v", err)
+		}
+		log.Printf("Emitted inactive status node %s with TTL %s", statusNode.ID(), ttl)
 	}
 }
