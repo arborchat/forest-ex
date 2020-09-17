@@ -31,19 +31,40 @@ func UnmarshalBinary(b []byte) (ActiveStatus, error) {
 	return ActiveStatus(i), e
 }
 
+type StatusState struct {
+	Status     ActiveStatus
+	Creation   time.Time
+	Expiration time.Time
+}
+
 // StatusManager maps users to their current status. We may eventually
 // want to store more metadata such as `last active`, but for now
 // just knowing is a given user is active is enough
 type StatusManager struct {
-	activeUsers map[string]ActiveStatus
+	activeUsers map[string]StatusState
 }
 
 // NewStatusManager instantiates an empty StatusManager struct and returns
 // a pointer to the new object.
 func NewStatusManager() *StatusManager {
-	return &StatusManager{
-		activeUsers: make(map[string]ActiveStatus),
+	mgr := StatusManager{
+		activeUsers: make(map[string]StatusState),
 	}
+	go func() {
+		cleanUpDuration, _ := time.ParseDuration("5m")
+		cleanUpTicker := time.NewTicker(cleanUpDuration)
+		for range cleanUpTicker.C {
+			for u, s := range mgr.activeUsers {
+				// If the expiration has passed,
+				if time.Now().After(s.Expiration) {
+					s.Status = Inactive
+					mgr.activeUsers[u] = s
+				}
+			}
+		}
+	}()
+
+	return &mgr
 }
 
 // HandleNode takes as an argument a reply node. If it is an active status message,
@@ -65,9 +86,9 @@ func (self *StatusManager) HandleNode(node forest.Node) {
 	status, err := UnmarshalBinary(data)
 	if err != nil {
 		log.Print("Malformed status request. Twig data: %b. Error: %v", data, err)
+		return
 	}
 	log.Printf("User %v updated status to %v", node.AuthorID(), status)
-	self.setStatus(*node.AuthorID(), status)
 
 	ttl, ttlExists := md.Values[expiration.TTLKey()]
 	if !ttlExists {
@@ -78,18 +99,25 @@ func (self *StatusManager) HandleNode(node forest.Node) {
 	expireTime, err := expiration.UnmarshalTTL(ttl)
 	if err != nil {
 		log.Print("Malformed status request. Twig data: %b. Error: %v", data, err)
+		return
 	}
-
-	go func() {
-		time.Sleep(time.Until(expireTime))
-		delete(self.activeUsers, string(node.AuthorID().Blob))
-	}()
+	self.setStatus(*node.AuthorID(), status, expireTime, node.CreatedAt())
 }
 
 // setStatus is intentionally left private so the status will always be set according to
 // the logic in HandleNode
-func (self *StatusManager) setStatus(user fields.QualifiedHash, status ActiveStatus) {
-	self.activeUsers[string(user.Blob)] = status
+func (self *StatusManager) setStatus(user fields.QualifiedHash, status ActiveStatus, expiresAt time.Time, creation time.Time) {
+	userHash := string(user.Blob)
+	if time.Now().After(expiresAt) || self.activeUsers[userHash].Creation.After(creation) {
+		return
+	}
+
+	state := StatusState{
+		Status:     status,
+		Creation:   creation,
+		Expiration: expiresAt,
+	}
+	self.activeUsers[string(user.Blob)] = state
 }
 
 // Status returns the active status of a given user. If that user
@@ -99,7 +127,7 @@ func (self *StatusManager) Status(user fields.QualifiedHash) ActiveStatus {
 	status := Inactive
 
 	if knownStatus, present := self.activeUsers[string(user.Blob)]; present {
-		status = knownStatus
+		status = knownStatus.Status
 	}
 
 	return status
@@ -144,7 +172,7 @@ func NewActivityMetadata(status ActiveStatus, ttl time.Duration) (*twig.Data, er
 		return nil, fmt.Errorf("Error creating TTL twig data: %v", err)
 	}
 
-	data.Set("invisible", 1, []byte("true"))
+	_, _ = data.Set("invisible", 1, []byte("true"))
 
 	data.Values[statusKey] = statusData
 	data.Values[ttlKey] = ttlData
@@ -199,7 +227,7 @@ func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.
 }
 
 func KillActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.Community, builder *forest.Builder) {
-	ttl, _ := time.ParseDuration("1 hour")
+	ttl, _ := time.ParseDuration("1h")
 	for _, c := range communities {
 		statusNode, err := NewActivityNode(c, builder, Inactive, ttl)
 		if err != nil {
@@ -207,7 +235,7 @@ func KillActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.C
 		}
 		err = msgStore.Add(statusNode)
 		if err != nil {
-			log.Printf("Error adding inactive status node %s to store: %v", err)
+			log.Printf("Error adding inactive status node to store: %v", err)
 		}
 		log.Printf("Emitted inactive status node %s with TTL %s", statusNode.ID(), ttl)
 	}
