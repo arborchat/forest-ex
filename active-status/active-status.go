@@ -51,7 +51,7 @@ func NewStatusManager() *StatusManager {
 		activeUsers: make(map[string]StatusState),
 	}
 	go func() {
-		cleanUpDuration, _ := time.ParseDuration("5m")
+		cleanUpDuration := time.Second * 30
 		cleanUpTicker := time.NewTicker(cleanUpDuration)
 		for range cleanUpTicker.C {
 			for u, s := range mgr.activeUsers {
@@ -158,7 +158,7 @@ func activeStatusMetadata(status ActiveStatus) (twig.Key, []byte) {
 // example:
 // ```
 //	// Set this node to be a "activity-status" node that lives for five hours
-//	ttl, _ = time.ParseDuration("5h")
+//	ttl = time.Hour * 5
 //	activityMetadata = NewActivityMetadata(Active, ttl)
 //	data, _ := activityMetadata.MarshalBinary()
 //	statusNode = forest.NewReply(parent, "", data)
@@ -227,7 +227,7 @@ func StartActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.
 }
 
 func KillActivityHeartBeat(msgStore store.ExtendedStore, communities []*forest.Community, builder *forest.Builder) {
-	ttl, _ := time.ParseDuration("1h")
+	ttl := time.Hour * 1
 	for _, c := range communities {
 		statusNode, err := NewActivityNode(c, builder, Inactive, ttl)
 		if err != nil {
