@@ -66,8 +66,8 @@ func (self *StatusManager) HandleNode(node forest.Node) {
 		log.Print("Malformed status request. Twig data: %v. Error: %v", data, err)
 	}
 
-	log.Printf("User %v updated status to %v", node.Author, status)
-	self.setStatus(node.Author, status)
+	log.Printf("User %v updated status to %v", *node.AuthorID(), status)
+	self.setStatus(*node.AuthorID(), status)
 }
 
 func (self *StatusManager) setStatus(user fields.QualifiedHash, status ActiveStatus) {
