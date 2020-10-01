@@ -1,0 +1,6 @@
+git.sr.ht/~whereswaldon/forest-go v0.0.0-20200917012818-960be2d2c5cc h1:ZvXYg5i51iaAYgXD9IXkkIQEpGYRMlLd9rBfk9uIroE=
+git.sr.ht/~whereswaldon/forest-go v0.0.0-20200917012818-960be2d2c5cc/go.mod h1:aGmm4R7ifFBvJWOHINDvZcKVOu+ODkD75NmNm/O0zME=
+github.com/ProtonMail/crypto v0.0.0-20200605105621-11f6ee2dd602/go.mod h1:Pxr7w4gA2ikI4sWyYwEffm+oew1WAJHzG1SiDpQMkrI=
+golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
