@@ -1,4 +1,4 @@
-module git.sr.ht/~athorp96/forest-ex
+module git.sr.ht/~whereswaldon/forest-ex
 
 go 1.14
 
